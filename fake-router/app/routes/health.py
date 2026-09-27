@@ -5,6 +5,7 @@ Planned endpoints:
 """
 from fastapi import APIRouter, status
 from pydantic import BaseModel
+from app.services import fault_service
 
 router = APIRouter()
 
@@ -13,4 +14,5 @@ class HealthCheck(BaseModel):
 
 @router.get("/health")
 async def health_check() -> HealthCheck:
+    await fault_service.apply_faults()
     return HealthCheck(status="OK")

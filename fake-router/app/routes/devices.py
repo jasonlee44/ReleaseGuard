@@ -7,7 +7,7 @@ Planned endpoints:
     POST /devices/{device_id}/config   — apply a configuration update
 """
 from fastapi import APIRouter, HTTPException
-from app.services import device_service
+from app.services import device_service, fault_service
 from app.schemas.device import DeviceListData, DeviceStatusData
 from app.schemas.config import DeviceConfigData, DeviceConfigUpdateData, DeviceConfigUpdateRequest
 
@@ -15,10 +15,12 @@ router = APIRouter()
 
 @router.get("/devices")
 async def get_devices() -> DeviceListData:
+    await fault_service.apply_faults()
     return device_service.get_device_list()
 
 @router.get("/devices/{device_id}/status")
 async def get_device_status(device_id: str) -> DeviceStatusData:
+    await fault_service.apply_faults()
     response = device_service.get_device_status(device_id)
     if response is None:
         raise HTTPException(
@@ -29,6 +31,7 @@ async def get_device_status(device_id: str) -> DeviceStatusData:
 
 @router.get("/devices/{device_id}/config")
 async def get_device_config(device_id: str) -> DeviceConfigData:
+    await fault_service.apply_faults()
     response = device_service.get_device_config(device_id)
     if response is None:
         raise HTTPException(
@@ -39,6 +42,7 @@ async def get_device_config(device_id: str) -> DeviceConfigData:
 
 @router.post("/devices/{device_id}/config")
 async def set_device_config(device_id: str, new_config: DeviceConfigUpdateRequest) -> DeviceConfigUpdateData:
+    await fault_service.apply_faults()
     response = device_service.update_device_config(device_id, new_config.config)
     if response is None:
         raise HTTPException(
