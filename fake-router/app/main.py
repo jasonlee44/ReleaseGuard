@@ -1,10 +1,11 @@
 """FastAPI application entry point for the ReleaseGuard Fake Router Service.
 
-This module creates the FastAPI app instance and will eventually register
+This module creates the FastAPI app instance and will register
 all route modules (health, devices, firmware, admin).
 """
 
 from fastapi import FastAPI
+
 from app.routes import admin, health, devices, firmware
 
 app = FastAPI(

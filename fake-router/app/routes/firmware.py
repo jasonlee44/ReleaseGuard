@@ -4,6 +4,7 @@ Planned endpoints:
     GET /firmware/version — returns product name, firmware version, and build id
 """
 from fastapi import APIRouter
+
 from app.schemas.firmware import FirmwareVersionData
 from app.services import device_service, fault_service
 

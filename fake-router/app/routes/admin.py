@@ -1,16 +1,13 @@
-"""Administrative routes for controlling simulated failure behavior.
-
-Planned endpoints:
-    POST /admin/fault-mode — set the active fault mode (normal, slow, error_prone,
-                             down, config_bug) and optional tuning parameters
-"""
+"""Administrative routes for controlling simulated failure behavior."""
 
 from fastapi import APIRouter
+
 from app.schemas.fault_mode import FaultModeRequest, FaultModeResponse
 from app.services import fault_service
 
 router = APIRouter()
 
 @router.post("/admin/fault-mode")
-async def set_fault_mode(mode: FaultModeRequest) -> FaultModeResponse:
-    return fault_service.set_current_fault_mode(mode.mode)
+async def set_fault_mode(fault: FaultModeRequest) -> FaultModeResponse:
+    """Set the global fault mode and tuning parameters."""
+    return fault_service.set_current_fault_mode(fault.mode, fault.delay_ms, fault.error_rate)

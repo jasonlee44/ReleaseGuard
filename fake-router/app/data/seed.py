@@ -1,11 +1,8 @@
 """Seeded in-memory device inventory and default configuration.
-
-Will hold fixed starter devices (e.g. router-001, router-002, switch-001)
-and their initial config documents. Route handlers and services will read
-and mutate this store during normal operation and config_bug fault mode.
 """
-from datetime import datetime, timezone
+
 import copy
+from datetime import datetime, timezone
 
 PRODUCT_NAME = "ReleaseGuard Fake Router"
 DEFAULT_FIRMWARE_VERSION = "2.4.1"
@@ -53,18 +50,24 @@ INITIAL_DEVICES: dict[str, dict] = {
             "vlan_ids": [50, 60],
             "routing_enabled": False,
         }
-    }
+    },
 }
 
 SEEDED_DEVICES: dict[str, dict] = copy.deepcopy(INITIAL_DEVICES)
 
-def get_device(device_id) -> dict | None:
+
+def get_device(device_id: str) -> dict | None:
+    """Return one device from the live store, or None if missing."""
     return SEEDED_DEVICES.get(device_id)
 
+
 def list_devices() -> list[dict]:
+    """Return all devices in the live store."""
     return list(SEEDED_DEVICES.values())
 
-def update_device_config(device_id, new_config) -> dict | None:
+
+def update_device_config(device_id: str, new_config: dict) -> dict | None:
+    """Replace a device's config, increment config_version, and return a deep copy."""
     device = SEEDED_DEVICES.get(device_id)
 
     if device is None:
@@ -73,8 +76,10 @@ def update_device_config(device_id, new_config) -> dict | None:
     device["config"] = copy.deepcopy(new_config)
     device["config_version"] += 1
 
-    return device
+    return copy.deepcopy(device)
 
-def reset_devices():
+
+def reset_devices() -> None:
+    """Restore SEEDED_DEVICES from INITIAL_DEVICES."""
     SEEDED_DEVICES.clear()
     SEEDED_DEVICES.update(copy.deepcopy(INITIAL_DEVICES))

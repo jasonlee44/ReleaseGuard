@@ -1,15 +1,16 @@
 """Routes for simulated network device operations.
 
-Planned endpoints:
-    GET  /devices                      — list all seeded devices
-    GET  /devices/{device_id}/status   — read operational status for one device
-    GET  /devices/{device_id}/config   — read running configuration
-    POST /devices/{device_id}/config   — apply a configuration update
+GET  /devices                      — list all seeded devices
+GET  /devices/{device_id}/status   — read operational status for one device
+GET  /devices/{device_id}/config   — read running configuration
+POST /devices/{device_id}/config   — apply a configuration update
 """
+
 from fastapi import APIRouter, HTTPException
-from app.services import device_service, fault_service
-from app.schemas.device import DeviceListData, DeviceStatusData
+
 from app.schemas.config import DeviceConfigData, DeviceConfigUpdateData, DeviceConfigUpdateRequest
+from app.schemas.device import DeviceListData, DeviceStatusData
+from app.services import device_service, fault_service
 
 router = APIRouter()
 
@@ -26,7 +27,7 @@ async def get_device_status(device_id: str) -> DeviceStatusData:
         raise HTTPException(
             status_code=404,
             detail=f"Device with id {device_id} not found."
-            )
+        )
     return response
 
 @router.get("/devices/{device_id}/config")

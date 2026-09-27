@@ -17,7 +17,12 @@ class FaultMode(str, Enum):
 
 class FaultModeRequest(BaseModel):
     mode: FaultMode
+    delay_ms: int = 2000
+    error_rate: float = 0.3
+
 
 class FaultModeResponse(BaseModel):
     mode: FaultMode
+    delay_ms: int
+    error_rate: float
     message: str

@@ -1,10 +1,11 @@
 """Routes for service health and liveness checks.
 
-Planned endpoints:
-    GET /health — returns service status and uptime for liveness probes.
+GET /health — returns service status for liveness probes; subject to fault injection.
 """
-from fastapi import APIRouter, status
+
+from fastapi import APIRouter
 from pydantic import BaseModel
+
 from app.services import fault_service
 
 router = APIRouter()
