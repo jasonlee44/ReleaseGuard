@@ -1,7 +1,7 @@
 """Tests for GET /health.
 
-Verify normal responses, latency under fault modes, and expected
-status codes when the service is in down or error_prone mode.
+Verify normal responses, latency under fault modes, and expected status codes 
+when the service is in down or error_prone mode.
 """
 
 import time
