@@ -1,11 +1,10 @@
-# ReleaseGuard — Phase 1: Fake Router Service
+# ReleaseGuard - Phase 1: Fake Router Service
 
-Simulated router/network device API for ReleaseGuard release reliability testing.
+Simulated router/network device API used by ReleaseGuard for release reliability testing.
 
-Phase 1 scaffolds the service structure only. Endpoint logic, schemas, fault
-injection, and tests will be added in later steps.
+This service is implemented. It behaves normally by default and can be switched into fault modes so later ReleaseGuard tests have realistic failures to catch. Device data is kept in memory (no database).
 
-## Planned endpoints
+## Endpoints
 
 | Method | Path | Purpose |
 |--------|------|---------|
@@ -17,7 +16,9 @@ injection, and tests will be added in later steps.
 | GET | `/firmware/version` | Firmware and build info |
 | POST | `/admin/fault-mode` | Set fault mode for testing |
 
-## Planned fault modes
+## Fault modes
+
+Set a global mode with `POST /admin/fault-mode`. Optional body fields: `delay_ms` (for `slow`) and `error_rate` (for `error_prone`).
 
 - `normal` — healthy behavior
 - `slow` — injected latency
@@ -41,7 +42,7 @@ fake-router/
 └── README.md
 ```
 
-## Setup (once implementation begins)
+## Setup
 
 From the `fake-router/` directory:
 
@@ -52,13 +53,12 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8001
 ```
 
-Interactive API docs will be at `http://localhost:8001/docs`.
+Interactive API docs: `http://localhost:8001/docs`
 
-## Next steps
+## Tests
 
-1. Implement Pydantic schemas in `app/schemas/`
-2. Add seeded device data in `app/data/seed.py`
-3. Implement fault mode state in `app/fault/state.py`
-4. Build service functions in `app/services/`
-5. Wire routes in `app/routes/` and register them in `app/main.py`
-6. Add pytest coverage in `tests/`
+With the virtualenv activated:
+
+```bash
+pytest
+```
