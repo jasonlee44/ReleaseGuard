@@ -5,6 +5,7 @@ registered here as Phase 2 endpoints are added.
 """
 
 from fastapi import FastAPI
+from app.routes import builds
 
 app = FastAPI(
     title="ReleaseGuard",
@@ -14,3 +15,5 @@ app = FastAPI(
     ),
     version="0.1.0",
 )
+
+app.include_router(builds.router)
