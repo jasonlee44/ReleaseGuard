@@ -12,6 +12,12 @@ async def create_test_run(payload: TestRunCreate) -> TestRun:
         raise HTTPException(status_code=404, detail="Build not found")
     return test_run
 
+
+@router.get("/test-runs")
+async def get_test_runs() -> list[TestRun]:
+    return test_run_service.list_test_runs()
+
+
 @router.get("/test-runs/{run_id}")
 async def get_test_run(run_id: UUID) -> TestRun:
     test_run = test_run_service.get_test_run(run_id)

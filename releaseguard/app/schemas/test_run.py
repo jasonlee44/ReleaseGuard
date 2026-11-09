@@ -16,6 +16,8 @@ class TestCaseResult(BaseModel):
 
     test_name: str
     endpoint: str
+    expected_result: str
+    actual_result: str
     status_code: int | None
     latency_ms: float
     passed: bool
@@ -28,6 +30,7 @@ class TestRun(BaseModel):
     run_id: UUID
     build_id: UUID
     status: Literal["passed", "failed"]
+    summary: str
     started_at: datetime
     completed_at: datetime
     results: list[TestCaseResult]
