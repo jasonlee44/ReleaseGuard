@@ -1,12 +1,21 @@
 # ReleaseGuard
 
-> A practice project that checks whether a new software release is safe to ship.
+> A tool that checks whether a new software release is safe to ship.
 
-When you push a new backend release, things can break in ways that normal "happy path" tests miss: slow responses, random errors, or services going down.
 
-I wanted to build something that looks for those problems on purpose. ReleaseGuard is supposed to run tests against a fake router API, notice when things fail, and eventually write a simple bug report so you know what went wrong.
+ReleaseGuard is a release reliability checker for backend services. You register a build (a named version of a release), and ReleaseGuard runs automated checks against that service to see if it looks safe to ship.
 
-This is mainly a learning project for backend and infrastructure skills. I'm starting with the APIs and working my way up.
+In this project there are two parts:
+
+- **`releaseguard/`** — the test runner. Creates builds, runs checks, stores pass/fail results.
+- **`fake-router/`** — the service under test. A simulated network/device API that can behave normally or fail on purpose (slow responses, random errors, downtime).
+
+
+## Why I built it
+
+When you ship a new backend release, things can break in ways normal "happy path" tests miss. I wanted a project that looks for those failures on purpose, and that also lets me practice backend and infrastructure skills: APIs, testing, reliability, databases, Docker, and CI.
+
+I'm building it step by step, starting with the APIs.
 
 ## Current status
 
@@ -43,7 +52,7 @@ You create a build in ReleaseGuard, it runs checks against the fake router, and 
         |
         v
    [In-memory store]
-   (PostgreSQL planned for Phase 3)
+   (PostgreSQL for Phase 3)
 ```
 
 
