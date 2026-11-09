@@ -10,17 +10,18 @@ This is mainly a learning project for backend and infrastructure skills. I'm sta
 
 ## Current status
 
-Still early. Right now I'm working on Phase 1.
+Mid Phase 2. The fake router is done, and the test runner can create builds and run a first set of checks against it.
 
 **Today**
 
 - A fake router service (`fake-router/`) that pretends to be a small network/device API
 - Endpoints for health, devices, config, firmware, and setting a fault mode
 - Ways to make the service act broken (slow, errors, down, etc.) so later tests have something real to catch
+- A ReleaseGuard test runner (`releaseguard/`) with in-memory builds and test runs
+- Test runs that probe fake-router health, devices, device status/config, and firmware version
 
 **Not yet**
 
-- The main ReleaseGuard test runner (the part that creates builds and runs tests)
 - Saving results in a database
 - Docker setup
 - Auto-generated bug reports
@@ -30,20 +31,19 @@ Still early. Right now I'm working on Phase 1.
 
 ## Architecture
 
-The long-term idea is pretty simple: you create a build, ReleaseGuard runs tests against the fake router, and it stores the results.
-
-Right now only the fake router part exists. The test runner and database are still planned.
+You create a build in ReleaseGuard, it runs checks against the fake router, and it stores the results in memory for now.
 
 ```text
 [You / API docs]
         |
         v
 [ReleaseGuard test runner]  --->  [Fake router service]
-   (not built yet)                      (Phase 1: this is what exists)
+   (Phase 2: in progress)         (Phase 1: implemented)
+   port 8000                      port 8001
         |
         v
-   [PostgreSQL]
-   (not built yet)
+   [In-memory store]
+   (PostgreSQL planned for Phase 3)
 ```
 
 
@@ -54,6 +54,8 @@ Right now only the fake router part exists. The test runner and database are sti
 ReleaseGuard/
 ├── fake-router/              # Fake router API (Phase 1)
 │   └── README.md             # How to run this service
+├── releaseguard/             # Test runner backend (Phase 2)
+│   └── README.md             # How to run the runner
 └── README.md                 # Overview of the whole project
 ```
 
@@ -77,6 +79,20 @@ uvicorn app.main:app --reload --port 8001
 
 Then open `http://localhost:8001/docs` to try the API.
 
+### ReleaseGuard test runner (Phase 2)
+
+More detail is in `[releaseguard/README.md](releaseguard/README.md)`. Start the fake router on port **8001** first if you want test runs to hit a live target.
+
+```bash
+cd releaseguard
+python -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+```
+
+Then open `http://localhost:8000/docs` to create builds and test runs.
+
 ## Roadmap
 
 1. **Phase 1: Fake router service** - build a small API that can behave normally or fail on purpose
@@ -99,5 +115,3 @@ Then open `http://localhost:8001/docs` to try the API.
 | Database            | PostgreSQL (planned)                          |
 | Infra               | Docker / Compose and GitHub Actions (planned) |
 | Frontend (later)    | React, TypeScript                             |
-
-
