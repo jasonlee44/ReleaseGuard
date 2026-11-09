@@ -17,6 +17,16 @@ When you ship a new backend release, things can break in ways normal "happy path
 
 I'm building it step by step, starting with the APIs.
 
+## Roadmap
+
+1. **Phase 1: Fake router service** - build a small API that can behave normally or fail on purpose
+2. **Phase 2: Test runner backend** - create builds and run tests against the fake router
+3. **Phase 3: PostgreSQL storage** - save builds, test runs, and results
+4. **Phase 4: Docker Compose** - run everything locally with one command
+5. **Phase 5: Bug report generation** - turn failed tests into a readable report
+6. **Phase 6: CI/CD** - run tests automatically on push
+7. **Phase 7: Frontend dashboard** - simple UI to view builds and results (only after the backend works)
+
 ## Current status
 
 Mid Phase 2. The fake router is done, and the test runner can create builds and run a first set of checks against it.
@@ -101,17 +111,6 @@ uvicorn app.main:app --reload --port 8000
 ```
 
 Then open `http://localhost:8000/docs` to create builds and test runs.
-
-## Roadmap
-
-1. **Phase 1: Fake router service** - build a small API that can behave normally or fail on purpose
-2. **Phase 2: Test runner backend** - create builds and run tests against the fake router
-3. **Phase 3: PostgreSQL storage** - save builds, test runs, and results
-4. **Phase 4: Docker Compose** - run everything locally with one command
-5. **Phase 5: Bug report generation** - turn failed tests into a readable report
-6. **Phase 6: CI/CD** - run tests automatically on push
-7. **Phase 7: Frontend dashboard** - simple UI to view builds and results (only after the backend works)
-
 
 
 ## Tech stack
