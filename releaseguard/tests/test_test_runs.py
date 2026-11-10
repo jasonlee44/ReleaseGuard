@@ -3,11 +3,13 @@ from unittest.mock import patch
 import pytest
 
 from app.services.test_run_service import (
+    ALL_CASE_RUNNERS,
+    CHAOS_CASE_RUNNERS,
+    DEFAULT_CASE_RUNNERS,
     LATENCY_THRESHOLD_MS,
     PROBE_CONFIG,
     PROBE_DEVICE_ID,
     REGRESSION_CONFIG,
-    SUITE_CASE_RUNNERS,
 )
 
 
@@ -42,7 +44,7 @@ def _admin_ok(mode: str = "normal") -> dict:
 
 
 def _happy_path_mocks():
-    """Mocks for cases 1–6 succeeding; fault probes still need separate side effects."""
+    """Mocks for cases 1–6 succeeding."""
     return {
         "get_health.return_value": _ok_response({"status": "OK"}),
         "get_devices.return_value": _ok_response(
@@ -53,6 +55,7 @@ def _happy_path_mocks():
                 "count": 1,
             }
         ),
+        "get_device_status.return_value": _ok_response(_status_body()),
         "get_device_config.return_value": _ok_response(
             {
                 "device_id": PROBE_DEVICE_ID,
@@ -78,20 +81,23 @@ def _happy_path_mocks():
                 "build_id": "router-api-v1.0",
             }
         ),
-        "set_fault_mode.return_value": _admin_ok("slow"),
         "reset_fault_mode.return_value": _admin_ok("normal"),
     }
 
 
-def _configure_full_suite_with_fault_failures(mock_client):
-    """Happy path passes; fault cases observe bad product behavior (option A → fail)."""
+def _configure_default_suite_success(mock_client):
+    """Default suite (cases 1–6) all succeed; no chaos fault injection."""
     mock_client.configure_mock(**_happy_path_mocks())
-    mock_client.get_device_status.side_effect = [
-        _ok_response(_status_body()),  # device_status
-        _ok_response(_status_body(), latency_ms=2200.0),  # slow_response
-    ]
+
+
+def _configure_chaos_suite_with_fault_failures(mock_client):
+    """Chaos suite observes bad product behavior under faults (option A → fail)."""
+    mock_client.set_fault_mode.return_value = _admin_ok("slow")
+    mock_client.reset_fault_mode.return_value = _admin_ok("normal")
+    mock_client.get_device_status.return_value = _ok_response(
+        _status_body(), latency_ms=2200.0
+    )
     mock_client.get_health.side_effect = [
-        _ok_response({"status": "OK"}),  # health_check
         {
             "status_code": 500,
             "latency_ms": 2.0,
@@ -105,46 +111,24 @@ def _configure_full_suite_with_fault_failures(mock_client):
             "error": None,
         },  # down_service
     ]
-    mock_client.update_device_config.side_effect = [
-        _ok_response(
-            {
-                "device_id": PROBE_DEVICE_ID,
-                "config_version": 2,
-                "config": PROBE_CONFIG,
-            }
-        ),  # config_update
-        _ok_response(
-            {
-                "device_id": PROBE_DEVICE_ID,
-                "config_version": 3,
-                "config": REGRESSION_CONFIG,
-            }
-        ),  # config_regression POST (lies)
-    ]
-    mock_client.get_device_config.side_effect = [
-        _ok_response(
-            {
-                "device_id": PROBE_DEVICE_ID,
-                "config_version": 1,
-                "config": {
-                    "hostname": "edge-01",
-                    "vlan_ids": [10, 20],
-                    "routing_enabled": True,
-                },
-            }
-        ),  # device_config read
-        _ok_response(
-            {
-                "device_id": PROBE_DEVICE_ID,
-                "config_version": 1,
-                "config": {
-                    "hostname": "edge-01",
-                    "vlan_ids": [10, 20],
-                    "routing_enabled": True,
-                },
-            }
-        ),  # config_regression GET (unchanged)
-    ]
+    mock_client.update_device_config.return_value = _ok_response(
+        {
+            "device_id": PROBE_DEVICE_ID,
+            "config_version": 3,
+            "config": REGRESSION_CONFIG,
+        }
+    )  # config_regression POST (may lie)
+    mock_client.get_device_config.return_value = _ok_response(
+        {
+            "device_id": PROBE_DEVICE_ID,
+            "config_version": 1,
+            "config": {
+                "hostname": "edge-01",
+                "vlan_ids": [10, 20],
+                "routing_enabled": True,
+            },
+        }
+    )  # config_regression GET (unchanged)
 
 
 def _create_build(client) -> str:
@@ -168,31 +152,51 @@ def test_create_test_run_missing_build(mock_client, client):
 
 
 @patch("app.services.test_run_service.router_client")
-def test_full_suite_fails_release_when_fault_modes_break_slos(mock_client, client):
-    _configure_full_suite_with_fault_failures(mock_client)
+def test_default_suite_passes_when_happy_path_succeeds(mock_client, client):
+    _configure_default_suite_success(mock_client)
     build_id = _create_build(client)
 
-    create_response = client.post("/test-runs", json={"build_id": build_id})
-    assert create_response.status_code == 200
-    created = create_response.json()
-    assert created["build_id"] == build_id
-    assert created["status"] == "failed"
-    assert len(created["results"]) == 10
-    assert "6/10 passed" in created["summary"]
-    assert all(case["expected_result"] for case in created["results"])
-    assert all(case["actual_result"] for case in created["results"])
-
-    by_name = {case["test_name"]: case for case in created["results"]}
-    for name in (
+    response = client.post("/test-runs", json={"build_id": build_id})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["build_id"] == build_id
+    assert body["suite"] == "default"
+    assert body["status"] == "passed"
+    assert body["summary"] == "6/6 passed"
+    assert len(body["results"]) == 6
+    assert all(case["passed"] for case in body["results"])
+    assert [case["test_name"] for case in body["results"]] == [
         "health_check",
         "devices_list",
         "device_status",
         "device_config",
         "config_update",
         "firmware_version",
-    ):
-        assert by_name[name]["passed"] is True
+    ]
+    assert mock_client.set_fault_mode.call_count == 0
+    assert mock_client.reset_fault_mode.call_count == 2
 
+
+@patch("app.services.test_run_service.router_client")
+def test_chaos_suite_fails_when_fault_modes_break_slos(mock_client, client):
+    _configure_chaos_suite_with_fault_failures(mock_client)
+    build_id = _create_build(client)
+
+    create_response = client.post(
+        "/test-runs",
+        json={"build_id": build_id, "suite": "chaos"},
+    )
+    assert create_response.status_code == 200
+    created = create_response.json()
+    assert created["build_id"] == build_id
+    assert created["suite"] == "chaos"
+    assert created["status"] == "failed"
+    assert len(created["results"]) == 4
+    assert "0/4 passed" in created["summary"]
+    assert all(case["expected_result"] for case in created["results"])
+    assert all(case["actual_result"] for case in created["results"])
+
+    by_name = {case["test_name"]: case for case in created["results"]}
     assert by_name["slow_response"]["passed"] is False
     assert "exceeded threshold" in (by_name["slow_response"]["failure_reason"] or "")
     assert by_name["slow_response"]["latency_ms"] > LATENCY_THRESHOLD_MS
@@ -206,23 +210,17 @@ def test_full_suite_fails_release_when_fault_modes_break_slos(mock_client, clien
     # start-of-suite reset + 4 per-fault resets + end-of-suite reset
     assert mock_client.reset_fault_mode.call_count == 6
 
-    expected_order = [
-        "health_check",
-        "devices_list",
-        "device_status",
-        "device_config",
-        "config_update",
-        "firmware_version",
+    assert [case["test_name"] for case in created["results"]] == [
         "slow_response",
         "error_prone_service",
         "down_service",
         "config_regression",
     ]
-    assert [case["test_name"] for case in created["results"]] == expected_order
 
     get_response = client.get(f"/test-runs/{created['run_id']}")
     assert get_response.status_code == 200
     assert get_response.json()["status"] == "failed"
+    assert get_response.json()["suite"] == "chaos"
 
     list_response = client.get("/test-runs")
     assert list_response.status_code == 200
@@ -233,81 +231,42 @@ def test_full_suite_fails_release_when_fault_modes_break_slos(mock_client, clien
 def test_create_test_run_failed_when_happy_path_probes_fail(mock_client, client):
     mock_client.configure_mock(
         **{
-            "get_health.side_effect": [
-                {
-                    "status_code": None,
-                    "latency_ms": 10.0,
-                    "body": None,
-                    "error": "connection refused",
-                },
-                {
-                    "status_code": None,
-                    "latency_ms": 10.0,
-                    "body": None,
-                    "error": "connection refused",
-                },
-                {
-                    "status_code": None,
-                    "latency_ms": 10.0,
-                    "body": None,
-                    "error": "connection refused",
-                },
-            ],
+            "get_health.return_value": {
+                "status_code": None,
+                "latency_ms": 10.0,
+                "body": None,
+                "error": "connection refused",
+            },
             "get_devices.return_value": {
                 "status_code": 503,
                 "latency_ms": 2.0,
                 "body": {"detail": "Service unavailable"},
                 "error": None,
             },
-            "get_device_status.side_effect": [
-                {
-                    "status_code": 503,
-                    "latency_ms": 2.0,
-                    "body": {"detail": "Service unavailable"},
-                    "error": None,
-                },
-                {
-                    "status_code": 503,
-                    "latency_ms": 2.0,
-                    "body": {"detail": "Service unavailable"},
-                    "error": None,
-                },
-            ],
-            "get_device_config.side_effect": [
-                {
-                    "status_code": 503,
-                    "latency_ms": 2.0,
-                    "body": {"detail": "Service unavailable"},
-                    "error": None,
-                },
-                {
-                    "status_code": 503,
-                    "latency_ms": 2.0,
-                    "body": {"detail": "Service unavailable"},
-                    "error": None,
-                },
-            ],
-            "update_device_config.side_effect": [
-                {
-                    "status_code": 503,
-                    "latency_ms": 2.0,
-                    "body": {"detail": "Service unavailable"},
-                    "error": None,
-                },
-                {
-                    "status_code": 503,
-                    "latency_ms": 2.0,
-                    "body": {"detail": "Service unavailable"},
-                    "error": None,
-                },
-            ],
+            "get_device_status.return_value": {
+                "status_code": 503,
+                "latency_ms": 2.0,
+                "body": {"detail": "Service unavailable"},
+                "error": None,
+            },
+            "get_device_config.return_value": {
+                "status_code": 503,
+                "latency_ms": 2.0,
+                "body": {"detail": "Service unavailable"},
+                "error": None,
+            },
+            "update_device_config.return_value": {
+                "status_code": 503,
+                "latency_ms": 2.0,
+                "body": {"detail": "Service unavailable"},
+                "error": None,
+            },
             "get_firmware_version.return_value": {
                 "status_code": 503,
                 "latency_ms": 2.0,
                 "body": {"detail": "Service unavailable"},
                 "error": None,
             },
-            "set_fault_mode.return_value": _admin_ok("down"),
             "reset_fault_mode.return_value": _admin_ok("normal"),
         }
     )
@@ -316,42 +275,36 @@ def test_create_test_run_failed_when_happy_path_probes_fail(mock_client, client)
     response = client.post("/test-runs", json={"build_id": build_id})
     assert response.status_code == 200
     body = response.json()
+    assert body["suite"] == "default"
     assert body["status"] == "failed"
-    assert len(body["results"]) == 10
+    assert len(body["results"]) == 6
     assert body["results"][0]["failure_reason"] == "connection refused"
-    assert mock_client.reset_fault_mode.call_count == 6
+    assert mock_client.set_fault_mode.call_count == 0
+    assert mock_client.reset_fault_mode.call_count == 2
 
 
 @patch("app.services.test_run_service.router_client")
 def test_config_update_mismatch_fails_case(mock_client, client):
-    _configure_full_suite_with_fault_failures(mock_client)
-    # Override first update (config_update case) to echo wrong config
-    mock_client.update_device_config.side_effect = [
-        _ok_response(
-            {
-                "device_id": PROBE_DEVICE_ID,
-                "config_version": 2,
-                "config": {
-                    "hostname": "wrong-host",
-                    "vlan_ids": [1],
-                    "routing_enabled": False,
-                },
-            }
-        ),
-        _ok_response(
-            {
-                "device_id": PROBE_DEVICE_ID,
-                "config_version": 3,
-                "config": REGRESSION_CONFIG,
-            }
-        ),
-    ]
+    _configure_default_suite_success(mock_client)
+    mock_client.update_device_config.return_value = _ok_response(
+        {
+            "device_id": PROBE_DEVICE_ID,
+            "config_version": 2,
+            "config": {
+                "hostname": "wrong-host",
+                "vlan_ids": [1],
+                "routing_enabled": False,
+            },
+        }
+    )
     build_id = _create_build(client)
 
     response = client.post("/test-runs", json={"build_id": build_id})
     assert response.status_code == 200
     body = response.json()
+    assert body["suite"] == "default"
     assert body["status"] == "failed"
+    assert len(body["results"]) == 6
     update_case = next(
         case for case in body["results"] if case["test_name"] == "config_update"
     )
@@ -371,78 +324,64 @@ def test_get_test_run_not_found(client):
     assert response.json()["detail"] == "Test run not found"
 
 
-def test_suite_defines_ten_core_cases_in_order():
-    assert len(SUITE_CASE_RUNNERS) == 10
-    assert [fn.__name__ for fn in SUITE_CASE_RUNNERS] == [
+def test_suite_runners_are_split_in_order():
+    assert len(DEFAULT_CASE_RUNNERS) == 6
+    assert [fn.__name__ for fn in DEFAULT_CASE_RUNNERS] == [
         "_run_health_check_case",
         "_run_devices_list_case",
         "_run_device_status_case",
         "_run_device_config_case",
         "_run_config_update_case",
         "_run_firmware_version_case",
+    ]
+    assert len(CHAOS_CASE_RUNNERS) == 4
+    assert [fn.__name__ for fn in CHAOS_CASE_RUNNERS] == [
         "_run_slow_response_case",
         "_run_error_prone_case",
         "_run_down_service_case",
         "_run_config_regression_case",
     ]
+    assert len(ALL_CASE_RUNNERS) == 10
+    assert list(ALL_CASE_RUNNERS) == list(DEFAULT_CASE_RUNNERS) + list(
+        CHAOS_CASE_RUNNERS
+    )
 
 
 @patch("app.services.test_run_service.router_client")
-def test_full_suite_passes_when_slos_hold_under_fault_modes(mock_client, client):
+def test_chaos_suite_passes_when_slos_hold_under_fault_modes(mock_client, client):
     """Option A pass path: product still meets SLOs even while fault modes are on."""
-    mock_client.configure_mock(**_happy_path_mocks())
-    mock_client.get_device_status.side_effect = [
-        _ok_response(_status_body()),  # device_status
-        _ok_response(_status_body(), latency_ms=120.0),  # slow_response under threshold
-    ]
-    mock_client.get_health.side_effect = [
-        _ok_response({"status": "OK"}),  # health_check
-        _ok_response({"status": "OK"}),  # error_prone still healthy
-        _ok_response({"status": "OK"}),  # down still healthy (resilient product)
-    ]
-    mock_client.update_device_config.side_effect = [
-        _ok_response(
-            {
-                "device_id": PROBE_DEVICE_ID,
-                "config_version": 2,
-                "config": PROBE_CONFIG,
-            }
-        ),
-        _ok_response(
-            {
-                "device_id": PROBE_DEVICE_ID,
-                "config_version": 3,
-                "config": REGRESSION_CONFIG,
-            }
-        ),
-    ]
-    mock_client.get_device_config.side_effect = [
-        _ok_response(
-            {
-                "device_id": PROBE_DEVICE_ID,
-                "config_version": 1,
-                "config": {
-                    "hostname": "edge-01",
-                    "vlan_ids": [10, 20],
-                    "routing_enabled": True,
-                },
-            }
-        ),
-        _ok_response(
-            {
-                "device_id": PROBE_DEVICE_ID,
-                "config_version": 3,
-                "config": REGRESSION_CONFIG,
-            }
-        ),  # config actually persisted
-    ]
+    mock_client.set_fault_mode.return_value = _admin_ok("slow")
+    mock_client.reset_fault_mode.return_value = _admin_ok("normal")
+    mock_client.get_device_status.return_value = _ok_response(
+        _status_body(), latency_ms=120.0
+    )
+    mock_client.get_health.return_value = _ok_response({"status": "OK"})
+    mock_client.update_device_config.return_value = _ok_response(
+        {
+            "device_id": PROBE_DEVICE_ID,
+            "config_version": 3,
+            "config": REGRESSION_CONFIG,
+        }
+    )
+    mock_client.get_device_config.return_value = _ok_response(
+        {
+            "device_id": PROBE_DEVICE_ID,
+            "config_version": 3,
+            "config": REGRESSION_CONFIG,
+        }
+    )
 
     build_id = _create_build(client)
-    response = client.post("/test-runs", json={"build_id": build_id})
+    response = client.post(
+        "/test-runs",
+        json={"build_id": build_id, "suite": "chaos"},
+    )
     assert response.status_code == 200
     body = response.json()
+    assert body["suite"] == "chaos"
     assert body["status"] == "passed"
-    assert body["summary"] == "10/10 passed"
+    assert body["summary"] == "4/4 passed"
+    assert len(body["results"]) == 4
     assert all(case["passed"] for case in body["results"])
 
 

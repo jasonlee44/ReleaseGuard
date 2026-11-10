@@ -383,19 +383,24 @@ def _run_config_regression_case() -> TestCaseResult:
         _reset_fault_mode()
 
 
-# Ordered Phase 2 suite (matches project core test cases 1–10)
-SUITE_CASE_RUNNERS = (
+# Ship-gate happy path (cases 1–6) vs intentional reliability probes (cases 7–10)
+DEFAULT_CASE_RUNNERS = (
     _run_health_check_case,
     _run_devices_list_case,
     _run_device_status_case,
     _run_device_config_case,
     _run_config_update_case,
     _run_firmware_version_case,
+)
+
+CHAOS_CASE_RUNNERS = (
     _run_slow_response_case,
     _run_error_prone_case,
     _run_down_service_case,
     _run_config_regression_case,
 )
+
+ALL_CASE_RUNNERS = DEFAULT_CASE_RUNNERS + CHAOS_CASE_RUNNERS
 
 
 def create_test_run(payload: TestRunCreate) -> TestRun | None:
@@ -403,13 +408,19 @@ def create_test_run(payload: TestRunCreate) -> TestRun | None:
     if str(payload.build_id) not in BUILDS:
         return None
 
+    runners = (
+        DEFAULT_CASE_RUNNERS
+        if payload.suite == "default"
+        else CHAOS_CASE_RUNNERS
+    )
+
     started_at = datetime.now(timezone.utc)
     results: list[TestCaseResult] = []
 
     try:
-        # Start from a known-good fault mode, then run the fixed suite order
+        # Start from a known-good fault mode, then run the selected suite
         _reset_fault_mode()
-        for run_case in SUITE_CASE_RUNNERS:
+        for run_case in runners:
             results.append(run_case())
     finally:
         # Belt-and-suspenders: never leave fake-router stuck in a fault mode
@@ -423,6 +434,7 @@ def create_test_run(payload: TestRunCreate) -> TestRun | None:
     test_run = TestRun(
         run_id=run_id,
         build_id=payload.build_id,
+        suite=payload.suite,
         status="passed" if all_passed else "failed",
         summary=summary,
         started_at=started_at,

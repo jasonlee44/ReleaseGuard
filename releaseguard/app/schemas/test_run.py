@@ -9,6 +9,8 @@ class TestRunCreate(BaseModel):
     __test__ = False
 
     build_id: UUID
+    # default = ship-gate happy path; chaos = reliability probes under fault modes
+    suite: Literal["default", "chaos"] = "default"
 
 
 class TestCaseResult(BaseModel):
@@ -29,6 +31,7 @@ class TestRun(BaseModel):
 
     run_id: UUID
     build_id: UUID
+    suite: Literal["default", "chaos"]
     status: Literal["passed", "failed"]
     summary: str
     started_at: datetime

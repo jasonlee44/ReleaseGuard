@@ -8,7 +8,7 @@ Backend that creates builds and runs reliability tests against the fake router s
 
 1. You create a **build** (a named release, e.g. `router-api` `1.0.0`).
 2. You start a **test run** for that build.
-3. ReleaseGuard calls the fake router (default `http://localhost:8001`) and runs a fixed **10-case suite**.
+3. ReleaseGuard calls the fake router (default `http://localhost:8001`) and runs either the **default** suite (happy path) or the **chaos** suite (reliability probes).
 4. It stores structured pass/fail results in memory and returns a summary.
 
 ReleaseGuard runs the tests. The fake router is the thing being tested.
@@ -19,13 +19,27 @@ ReleaseGuard runs the tests. The fake router is the thing being tested.
 |--------|------|---------|
 | POST | `/builds` | Create a build |
 | GET | `/builds` | List builds |
-| POST | `/test-runs` | Run the full suite for a `build_id` |
+| POST | `/test-runs` | Run a suite for a `build_id` (default = happy path) |
 | GET | `/test-runs` | List test runs |
 | GET | `/test-runs/{run_id}` | Get one test run |
 
-## Test suite (10 cases)
+### Create a test run
 
-Happy path (normal mode):
+```json
+{ "build_id": "<uuid>" }
+```
+
+```json
+{ "build_id": "<uuid>", "suite": "chaos" }
+```
+
+`suite` is optional and defaults to `"default"`. Allowed values: `"default"`, `"chaos"`.
+
+## Suites
+
+### Default suite (ship gate) — cases 1–6
+
+Runs under normal mode (no fault injection):
 
 1. `health_check`
 2. `devices_list`
@@ -34,14 +48,18 @@ Happy path (normal mode):
 5. `config_update` (write)
 6. `firmware_version`
 
-Reliability probes (ReleaseGuard sets fault mode, probes, then resets):
+A default run is **`passed`** only if all 6 cases pass. Against a healthy stock fake-router, this suite should **pass**.
 
-7. `slow_response` — fails if latency > 500ms under `slow`
-8. `error_prone_service` — fails if `/health` is unhealthy under `error_prone`
-9. `down_service` — fails if `/health` is unhealthy under `down`
-10. `config_regression` — fails if config does not persist under `config_bug`
+### Chaos suite (reliability probes) — cases 7–10
 
-A run is **`passed`** only if all 10 cases pass. Against stock fake-router, cases 7–10 usually fail by design.
+ReleaseGuard sets fault mode, probes, then resets (option A: release fails if the product breaks SLOs under the fault):
+
+1. `slow_response` — fails if latency > 500ms under `slow`
+2. `error_prone_service` — fails if `/health` is unhealthy under `error_prone`
+3. `down_service` — fails if `/health` is unhealthy under `down`
+4. `config_regression` — fails if config does not persist under `config_bug`
+
+A chaos run is **`passed`** only if all 4 cases pass. Against stock fake-router, chaos usually **fails** by design.
 
 ## Setup
 

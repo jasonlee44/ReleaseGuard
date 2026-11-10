@@ -35,8 +35,8 @@ I'm building it step by step, starting with the APIs.
 
 - A fake router service (`fake-router/`) with health, devices, config, firmware, and fault modes
 - A ReleaseGuard test runner (`releaseguard/`) with builds and test runs APIs
-- A 10-case suite: happy-path checks plus slow / error-prone / down / config regression probes
-- Structured results (`expected_result`, `actual_result`, `summary`, pass/fail)
+- Two suites: **default** (6 happy-path checks, ship gate) and **chaos** (4 reliability probes under fault modes)
+- Structured results (`suite`, `expected_result`, `actual_result`, `summary`, pass/fail)
 - Pytest coverage for the runner (mocked fake-router); optional live check via `RUN_INTEGRATION=1`
 
 **Not yet**
@@ -50,7 +50,7 @@ I'm building it step by step, starting with the APIs.
 
 ## Architecture
 
-You create a build in ReleaseGuard, it runs the 10-case suite against the fake router, and it stores the results in memory for now.
+You create a build in ReleaseGuard, start a test run with `suite` set to `default` (ship gate) or `chaos` (reliability probes), and ReleaseGuard stores the results in memory for now.
 
 ```text
 [You / API docs]
@@ -112,7 +112,7 @@ uvicorn app.main:app --reload --port 8000
 
 Then open `http://localhost:8000/docs` to create builds and test runs.
 
-Note: a full suite against stock fake-router often ends **`failed`** on purpose — fault-mode cases (slow / errors / down / config bug) are meant to catch reliability problems.
+Note: the **default** suite against stock fake-router should **pass**. Use `"suite": "chaos"` for reliability probes — those often end **`failed`** on purpose against stock fault behavior.
 
 
 ## Tech stack
