@@ -4,8 +4,16 @@ This module creates the FastAPI app instance. Route modules will be
 registered here as Phase 2 endpoints are added.
 """
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from app.routes import builds, test_runs
+from app.db.database import init_db
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    yield
 
 app = FastAPI(
     title="ReleaseGuard",
@@ -14,6 +22,7 @@ app = FastAPI(
         "tests against the fake router service, and records pass/fail results."
     ),
     version="0.1.0",
+    lifespan=lifespan
 )
 
 app.include_router(builds.router)

@@ -1,6 +1,8 @@
 import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from app.db.models import Base
+from app.db import models
 
 
 DEFAULT_DATABASE_URL = "postgresql+psycopg://jasonlee@localhost:5432/releaseguard"
@@ -18,3 +20,6 @@ def get_session():
         yield db
     finally:
         db.close()
+
+def init_db() -> None:
+    Base.metadata.create_all(bind=engine)
