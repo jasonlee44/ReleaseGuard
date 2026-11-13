@@ -6,3 +6,7 @@ pydantic>=2.10.0,<3.0.0
 # HTTP client (fake-router calls) and testing
 httpx>=0.28.0,<1.0.0
 pytest>=8.3.0,<9.0.0
+
+# PostgreSQL persistence (Phase 3)
+sqlalchemy>=2.0.0,<3.0.0
+psycopg[binary]>=3.2.0,<4.0.0
