@@ -2,17 +2,18 @@
 
 > A tool that checks whether a new software release is safe to ship.
 
-**Stack:** Python · FastAPI · Pydantic · SQLAlchemy · PostgreSQL · httpx · pytest  
-*(planned: Docker Compose, GitHub Actions, React/TypeScript)*
+**Stack:** Python · FastAPI · Pydantic · SQLAlchemy · PostgreSQL · Docker Compose · httpx · pytest  
+*(planned: GitHub Actions, React/TypeScript)*
 
 ## Tech stack
+
 
 | Area                | Choices                                       |
 | ------------------- | --------------------------------------------- |
 | Backend             | Python, FastAPI, Pydantic, SQLAlchemy         |
 | HTTP client / tests | httpx, pytest                                 |
 | Database            | PostgreSQL                                    |
-| Infra               | Docker / Compose and GitHub Actions (planned) |
+| Infra               | Docker Compose (local demo); GitHub Actions (planned) |
 | Frontend (later)    | React, TypeScript                             |
 
 ReleaseGuard is a release reliability checker for backend services. You register a build (a named version of a release), and ReleaseGuard runs automated checks against that service to see if it looks safe to ship.
@@ -31,7 +32,7 @@ I'm building it step by step, starting with the APIs.
 
 ## Current status
 
-**Phase 3 complete.** The fake router and the test runner both work. Builds, test runs, and case results are saved in PostgreSQL.
+**Phase 4 complete.** The full local stack (Postgres, fake-router, releaseguard) runs with Docker Compose. Builds, test runs, and case results are saved in PostgreSQL.
 
 **Today**
 
@@ -40,11 +41,11 @@ I'm building it step by step, starting with the APIs.
 - Two suites: **default** (6 happy-path checks, ship gate) and **chaos** (4 reliability probes under fault modes)
 - Structured results (`suite`, `expected_result`, `actual_result`, `summary`, pass/fail)
 - PostgreSQL persistence for builds, test runs, and case results
+- Docker Compose for one-command local demo (`db`, `fake-router`, `releaseguard`)
 - Pytest coverage for the runner (mocked fake-router); optional live check via `RUN_INTEGRATION=1`
 
 **Not yet**
 
-- Docker setup
 - Auto-generated bug reports
 - CI or a frontend
 
@@ -59,11 +60,12 @@ You create a build in ReleaseGuard, start a test run with `suite` set to `defaul
         |
         v
 [ReleaseGuard test runner]  --->  [Fake router service]
-   (Phase 3: complete)            (Phase 1: complete)
+   (Phase 4: Compose)             (Phase 1: complete)
    port 8000                      port 8001
         |
         v
    [PostgreSQL]
+   (Compose service: db)
 ```
 
 
@@ -72,10 +74,13 @@ You create a build in ReleaseGuard, start a test run with `suite` set to `defaul
 
 ```text
 ReleaseGuard/
+├── docker-compose.yml        # Phase 4: db + fake-router + releaseguard
 ├── fake-router/              # Fake router API (Phase 1)
-│   └── README.md             # How to run this service
-├── releaseguard/             # Test runner + Postgres (Phase 3)
-│   └── README.md             # How to run the runner
+│   ├── Dockerfile
+│   └── README.md
+├── releaseguard/             # Test runner + Postgres (Phase 3+)
+│   ├── Dockerfile
+│   └── README.md
 └── README.md                 # Overview of the whole project
 ```
 
@@ -83,11 +88,30 @@ ReleaseGuard/
 
 ## Quick start
 
+### Docker Compose (Phase 4) — recommended for local demo
 
+Requires Docker (e.g. Colima or Docker Desktop) running.
 
-### Fake router (Phase 1)
+```bash
+docker compose up --build
+```
 
-More detail is in `[fake-router/README.md](fake-router/README.md)`.
+Then open:
+
+- ReleaseGuard docs: `http://localhost:8000/docs`
+- Fake router docs: `http://localhost:8001/docs`
+
+Smoke path: create a build → start a **default** suite test run → expect **passed** against stock fake-router. Use `"suite": "chaos"` for reliability probes — those often end **`failed`** on purpose.
+
+Ports: **8000** (releaseguard), **8001** (fake-router), **5432** (Postgres). Stop with Ctrl+C or `docker compose down`.
+
+Host `pytest` does **not** require Compose; keep using local Postgres + `releaseguard_test` as documented in [`releaseguard/README.md`](releaseguard/README.md).
+
+### Without Docker (venvs + local Postgres)
+
+#### Fake router
+
+More detail is in [`fake-router/README.md`](fake-router/README.md).
 
 ```bash
 cd fake-router
@@ -99,9 +123,9 @@ uvicorn app.main:app --reload --port 8001
 
 Then open `http://localhost:8001/docs` to try the API.
 
-### ReleaseGuard test runner (Phase 3)
+#### ReleaseGuard test runner
 
-More detail is in `[releaseguard/README.md](releaseguard/README.md)`. Postgres must be running locally with a `releaseguard` database. Start the fake router on port **8001** first if you want test runs to hit a live target.
+More detail is in [`releaseguard/README.md`](releaseguard/README.md). Postgres must be running locally with a `releaseguard` database. Start the fake router on port **8001** first if you want test runs to hit a live target.
 
 ```bash
 cd releaseguard
@@ -112,8 +136,6 @@ uvicorn app.main:app --reload --port 8000
 ```
 
 Then open `http://localhost:8000/docs` to create builds and test runs.
-
-Note: the **default** suite against stock fake-router should **pass**. Use `"suite": "chaos"` for reliability probes — those often end **`failed`** on purpose against stock fault behavior.
 
 
 ## Roadmap
