@@ -2,6 +2,18 @@
 
 > A tool that checks whether a new software release is safe to ship.
 
+**Stack:** Python · FastAPI · Pydantic · SQLAlchemy · PostgreSQL · httpx · pytest  
+*(planned: Docker Compose, GitHub Actions, React/TypeScript)*
+
+## Tech stack
+
+| Area                | Choices                                       |
+| ------------------- | --------------------------------------------- |
+| Backend             | Python, FastAPI, Pydantic, SQLAlchemy         |
+| HTTP client / tests | httpx, pytest                                 |
+| Database            | PostgreSQL                                    |
+| Infra               | Docker / Compose and GitHub Actions (planned) |
+| Frontend (later)    | React, TypeScript                             |
 
 ReleaseGuard is a release reliability checker for backend services. You register a build (a named version of a release), and ReleaseGuard runs automated checks against that service to see if it looks safe to ship.
 
@@ -16,16 +28,6 @@ In this project there are two parts:
 When you ship a new backend release, things can break in ways normal "happy path" tests miss. I wanted a project that looks for those failures on purpose, and that also lets me practice backend and infrastructure skills: APIs, testing, reliability, databases, Docker, and CI.
 
 I'm building it step by step, starting with the APIs.
-
-## Roadmap
-
-1. **Phase 1: Fake router service** - build a small API that can behave normally or fail on purpose
-2. **Phase 2: Test runner backend** - create builds and run tests against the fake router
-3. **Phase 3: PostgreSQL storage** - save builds, test runs, and results
-4. **Phase 4: Docker Compose** - run everything locally with one command
-5. **Phase 5: Bug report generation** - turn failed tests into a readable report
-6. **Phase 6: CI/CD** - run tests automatically on push
-7. **Phase 7: Frontend dashboard** - simple UI to view builds and results (only after the backend works)
 
 ## Current status
 
@@ -114,13 +116,12 @@ Then open `http://localhost:8000/docs` to create builds and test runs.
 Note: the **default** suite against stock fake-router should **pass**. Use `"suite": "chaos"` for reliability probes — those often end **`failed`** on purpose against stock fault behavior.
 
 
-## Tech stack
+## Roadmap
 
-
-| Area                | Choices                                       |
-| ------------------- | --------------------------------------------- |
-| Backend             | Python, FastAPI, Pydantic, SQLAlchemy         |
-| HTTP client / tests | httpx, pytest                                 |
-| Database            | PostgreSQL                                    |
-| Infra               | Docker / Compose and GitHub Actions (planned) |
-| Frontend (later)    | React, TypeScript                             |
+1. **Phase 1: Fake router service** - build a small API that can behave normally or fail on purpose
+2. **Phase 2: Test runner backend** - create builds and run tests against the fake router
+3. **Phase 3: PostgreSQL storage** - save builds, test runs, and results
+4. **Phase 4: Docker Compose** - run everything locally with one command
+5. **Phase 5: Bug report generation** - turn failed tests into a readable report
+6. **Phase 6: CI/CD** - run tests automatically on push
+7. **Phase 7: Frontend dashboard** - simple UI to view builds and results (only after the backend works)
