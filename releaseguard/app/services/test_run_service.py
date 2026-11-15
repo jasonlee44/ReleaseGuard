@@ -2,9 +2,11 @@ from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
 from app.clients import router_client
-from app.data.builds import BUILDS
-from app.data.test_runs import TEST_RUNS
 from app.schemas.test_run import TestCaseResult, TestRun, TestRunCreate
+
+from sqlalchemy import select
+from app.db.database import SessionLocal
+from app.db import models
 
 # Seeded device used for status/config checks against fake-router
 PROBE_DEVICE_ID = "router-001"
@@ -405,8 +407,12 @@ ALL_CASE_RUNNERS = DEFAULT_CASE_RUNNERS + CHAOS_CASE_RUNNERS
 
 def create_test_run(payload: TestRunCreate) -> TestRun | None:
     # Cannot test a release we never registered
-    if str(payload.build_id) not in BUILDS:
-        return None
+    with SessionLocal() as session:
+        build = session.scalar(
+            select(models.Build).where(models.Build.build_id == payload.build_id)
+        )
+        if build is None:
+            return None
 
     runners = (
         DEFAULT_CASE_RUNNERS
@@ -415,23 +421,36 @@ def create_test_run(payload: TestRunCreate) -> TestRun | None:
     )
 
     started_at = datetime.now(timezone.utc)
-    results: list[TestCaseResult] = []
+    case_results: list[TestCaseResult] = []
 
     try:
         # Start from a known-good fault mode, then run the selected suite
         _reset_fault_mode()
         for run_case in runners:
-            results.append(run_case())
+            case_results.append(run_case())
     finally:
         # Belt-and-suspenders: never leave fake-router stuck in a fault mode
         _reset_fault_mode()
 
     completed_at = datetime.now(timezone.utc)
-    all_passed = all(case.passed for case in results)
-    summary = _build_summary(results)
+    all_passed = all(case.passed for case in case_results)
+    summary = _build_summary(case_results)
 
     run_id = uuid4()
-    test_run = TestRun(
+    orm_results = [
+        models.TestCaseResult(
+            id=uuid4(),
+            test_name=case.test_name,
+            endpoint=case.endpoint,
+            expected_result=case.expected_result,
+            actual_result=case.actual_result,
+            status_code=case.status_code,
+            latency_ms=case.latency_ms,
+            passed=case.passed,
+            failure_reason=case.failure_reason,
+        ) for case in case_results
+    ]
+    orm_test_run = models.TestRun(
         run_id=run_id,
         build_id=payload.build_id,
         suite=payload.suite,
@@ -439,15 +458,82 @@ def create_test_run(payload: TestRunCreate) -> TestRun | None:
         summary=summary,
         started_at=started_at,
         completed_at=completed_at,
-        results=results,
+        results=orm_results,
     )
-    TEST_RUNS[str(run_id)] = test_run
-    return test_run
+    with SessionLocal() as session:
+        session.add(orm_test_run)
+        session.commit()
+    
+        return TestRun(
+            run_id=orm_test_run.run_id,
+            build_id=orm_test_run.build_id,
+            suite=orm_test_run.suite,
+            status=orm_test_run.status,
+            summary=orm_test_run.summary,
+            started_at=orm_test_run.started_at,
+            completed_at=orm_test_run.completed_at,
+            results=case_results,
+        )
 
 
 def list_test_runs() -> list[TestRun]:
-    return list(TEST_RUNS.values())
+    with SessionLocal() as session:
+        rows = session.scalars(select(models.TestRun)).all()
+        return [
+            TestRun(
+                run_id=row.run_id,
+                build_id=row.build_id,
+                suite=row.suite,
+                status=row.status,
+                summary=row.summary,
+                started_at=row.started_at,
+                completed_at=row.completed_at,
+                results=[
+                    TestCaseResult(
+                        test_name=case.test_name,
+                        endpoint=case.endpoint,
+                        expected_result=case.expected_result,
+                        actual_result=case.actual_result,
+                        status_code=case.status_code,
+                        latency_ms=case.latency_ms,
+                        passed=case.passed,
+                        failure_reason=case.failure_reason,
+                    )
+                    for case in row.results
+                ]
+            )
+            for row in rows
+        ]
+
 
 
 def get_test_run(run_id: UUID) -> TestRun | None:
-    return TEST_RUNS.get(str(run_id))
+    with SessionLocal() as session:
+        run = session.scalar(
+            select(models.TestRun).where(models.TestRun.run_id == run_id)
+        )
+        if run is None:
+            return None
+        
+        return TestRun(
+            run_id=run.run_id,
+            build_id=run.build_id,
+            suite=run.suite,
+            status=run.status,
+            summary=run.summary,
+            started_at=run.started_at,
+            completed_at=run.completed_at,
+            results=[
+                TestCaseResult(
+                    test_name=case.test_name,
+                    endpoint=case.endpoint,
+                    expected_result=case.expected_result,
+                    actual_result=case.actual_result,
+                    status_code=case.status_code,
+                    latency_ms=case.latency_ms,
+                    passed=case.passed,
+                    failure_reason=case.failure_reason,
+                )
+                for case in run.results
+            ]
+        )

@@ -7,7 +7,7 @@ ReleaseGuard is a release reliability checker for backend services. You register
 
 In this project there are two parts:
 
-- **`releaseguard/`** — the test runner. Creates builds, runs checks, stores pass/fail results.
+- **`releaseguard/`** — the test runner. Creates builds, runs checks, stores pass/fail results in PostgreSQL.
 - **`fake-router/`** — the service under test. A simulated network/device API that can behave normally or fail on purpose (slow responses, random errors, downtime).
 
 
@@ -29,7 +29,7 @@ I'm building it step by step, starting with the APIs.
 
 ## Current status
 
-**Phase 2 complete.** The fake router and the test runner both work. Builds and test runs are stored in memory for now.
+**Phase 3 complete.** The fake router and the test runner both work. Builds, test runs, and case results are saved in PostgreSQL.
 
 **Today**
 
@@ -37,11 +37,11 @@ I'm building it step by step, starting with the APIs.
 - A ReleaseGuard test runner (`releaseguard/`) with builds and test runs APIs
 - Two suites: **default** (6 happy-path checks, ship gate) and **chaos** (4 reliability probes under fault modes)
 - Structured results (`suite`, `expected_result`, `actual_result`, `summary`, pass/fail)
+- PostgreSQL persistence for builds, test runs, and case results
 - Pytest coverage for the runner (mocked fake-router); optional live check via `RUN_INTEGRATION=1`
 
 **Not yet**
 
-- Saving results in a database (Phase 3)
 - Docker setup
 - Auto-generated bug reports
 - CI or a frontend
@@ -50,19 +50,18 @@ I'm building it step by step, starting with the APIs.
 
 ## Architecture
 
-You create a build in ReleaseGuard, start a test run with `suite` set to `default` (ship gate) or `chaos` (reliability probes), and ReleaseGuard stores the results in memory for now.
+You create a build in ReleaseGuard, start a test run with `suite` set to `default` (ship gate) or `chaos` (reliability probes), and ReleaseGuard stores the results in PostgreSQL.
 
 ```text
 [You / API docs]
         |
         v
 [ReleaseGuard test runner]  --->  [Fake router service]
-   (Phase 2: complete)            (Phase 1: complete)
+   (Phase 3: complete)            (Phase 1: complete)
    port 8000                      port 8001
         |
         v
-   [In-memory store]
-   (PostgreSQL for Phase 3)
+   [PostgreSQL]
 ```
 
 
@@ -73,7 +72,7 @@ You create a build in ReleaseGuard, start a test run with `suite` set to `defaul
 ReleaseGuard/
 ├── fake-router/              # Fake router API (Phase 1)
 │   └── README.md             # How to run this service
-├── releaseguard/             # Test runner backend (Phase 2)
+├── releaseguard/             # Test runner + Postgres (Phase 3)
 │   └── README.md             # How to run the runner
 └── README.md                 # Overview of the whole project
 ```
@@ -98,9 +97,9 @@ uvicorn app.main:app --reload --port 8001
 
 Then open `http://localhost:8001/docs` to try the API.
 
-### ReleaseGuard test runner (Phase 2)
+### ReleaseGuard test runner (Phase 3)
 
-More detail is in `[releaseguard/README.md](releaseguard/README.md)`. Start the fake router on port **8001** first if you want test runs to hit a live target.
+More detail is in `[releaseguard/README.md](releaseguard/README.md)`. Postgres must be running locally with a `releaseguard` database. Start the fake router on port **8001** first if you want test runs to hit a live target.
 
 ```bash
 cd releaseguard
@@ -120,8 +119,8 @@ Note: the **default** suite against stock fake-router should **pass**. Use `"sui
 
 | Area                | Choices                                       |
 | ------------------- | --------------------------------------------- |
-| Backend             | Python, FastAPI, Pydantic                     |
+| Backend             | Python, FastAPI, Pydantic, SQLAlchemy         |
 | HTTP client / tests | httpx, pytest                                 |
-| Database            | PostgreSQL (planned)                          |
+| Database            | PostgreSQL                                    |
 | Infra               | Docker / Compose and GitHub Actions (planned) |
 | Frontend (later)    | React, TypeScript                             |

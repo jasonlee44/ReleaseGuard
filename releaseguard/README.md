@@ -1,15 +1,15 @@
-# ReleaseGuard — Phase 2: Test Runner
+# ReleaseGuard — Phase 3: Test Runner + Postgres
 
 Backend that creates builds and runs reliability tests against the fake router service.
 
-**Status:** Phase 2 complete. In-memory storage for now; PostgreSQL comes in Phase 3.
+**Status:** Phase 3 complete. Builds, test runs, and case results persist in PostgreSQL.
 
 ## What it does
 
 1. You create a **build** (a named release, e.g. `router-api` `1.0.0`).
 2. You start a **test run** for that build.
 3. ReleaseGuard calls the fake router (default `http://localhost:8001`) and runs either the **default** suite (happy path) or the **chaos** suite (reliability probes).
-4. It stores structured pass/fail results in memory and returns a summary.
+4. It stores structured pass/fail results in PostgreSQL and returns a summary.
 
 ReleaseGuard runs the tests. The fake router is the thing being tested.
 
@@ -61,7 +61,42 @@ ReleaseGuard sets fault mode, probes, then resets (option A: release fails if th
 
 A chaos run is **`passed`** only if all 4 cases pass. Against stock fake-router, chaos usually **fails** by design.
 
+## What's stored
+
+| Table | Purpose |
+|--------|---------|
+| `builds` | Release labels (name, version, description) |
+| `test_runs` | Suite run, status, summary, timestamps |
+| `test_case_results` | Per-case outcomes for each run |
+
 ## Setup
+
+Start order: **Postgres** → **fake-router** (port 8001) → **releaseguard** (port 8000).
+
+### Postgres
+
+Postgres must be running locally. Create the app and test databases:
+
+```bash
+createdb releaseguard
+createdb releaseguard_test
+```
+
+By default ReleaseGuard uses:
+
+```text
+postgresql+psycopg://jasonlee@localhost:5432/releaseguard
+```
+
+Override with:
+
+```bash
+export DATABASE_URL=postgresql+psycopg://jasonlee@localhost:5432/releaseguard
+```
+
+Tables are created automatically on app startup (`create_all`).
+
+### App
 
 From the `releaseguard/` directory:
 
@@ -83,6 +118,8 @@ export FAKE_ROUTER_URL=http://localhost:8001
 ```
 
 ## Tests
+
+Pytest uses the `releaseguard_test` database (set in `tests/conftest.py`). That database must exist.
 
 ```bash
 pytest
