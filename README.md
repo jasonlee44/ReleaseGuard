@@ -5,17 +5,6 @@
 **Stack:** Python · FastAPI · Pydantic · SQLAlchemy · PostgreSQL · Docker Compose · httpx · pytest  
 *(planned: GitHub Actions, React/TypeScript)*
 
-## Tech stack
-
-
-| Area                | Choices                                       |
-| ------------------- | --------------------------------------------- |
-| Backend             | Python, FastAPI, Pydantic, SQLAlchemy         |
-| HTTP client / tests | httpx, pytest                                 |
-| Database            | PostgreSQL                                    |
-| Infra               | Docker Compose (local demo); GitHub Actions (planned) |
-| Frontend (later)    | React, TypeScript                             |
-
 ReleaseGuard is a release reliability checker for backend services. You register a build (a named version of a release), and ReleaseGuard runs automated checks against that service to see if it looks safe to ship.
 
 In this project there are two parts:
@@ -23,72 +12,14 @@ In this project there are two parts:
 - **`releaseguard/`** — the test runner. Creates builds, runs checks, stores pass/fail results in PostgreSQL.
 - **`fake-router/`** — the service under test. A simulated network/device API that can behave normally or fail on purpose (slow responses, random errors, downtime).
 
-
-## Why I built it
-
-When you ship a new backend release, things can break in ways normal "happy path" tests miss. I wanted a project that looks for those failures on purpose, and that also lets me practice backend and infrastructure skills: APIs, testing, reliability, databases, Docker, and CI.
-
-I'm building it step by step, starting with the APIs.
-
-## Current status
-
-**Phase 4 complete.** The full local stack (Postgres, fake-router, releaseguard) runs with Docker Compose. Builds, test runs, and case results are saved in PostgreSQL.
-
-**Today**
-
-- A fake router service (`fake-router/`) with health, devices, config, firmware, and fault modes
-- A ReleaseGuard test runner (`releaseguard/`) with builds and test runs APIs
-- Two suites: **default** (6 happy-path checks, ship gate) and **chaos** (4 reliability probes under fault modes)
-- Structured results (`suite`, `expected_result`, `actual_result`, `summary`, pass/fail)
-- PostgreSQL persistence for builds, test runs, and case results
-- Docker Compose for one-command local demo (`db`, `fake-router`, `releaseguard`)
-- Pytest coverage for the runner (mocked fake-router); optional live check via `RUN_INTEGRATION=1`
-
-**Not yet**
-
-- Auto-generated bug reports
-- CI or a frontend
-
-
-
-## Architecture
-
-You create a build in ReleaseGuard, start a test run with `suite` set to `default` (ship gate) or `chaos` (reliability probes), and ReleaseGuard stores the results in PostgreSQL.
-
-```text
-[You / API docs]
-        |
-        v
-[ReleaseGuard test runner]  --->  [Fake router service]
-   (Phase 4: Compose)             (Phase 1: complete)
-   port 8000                      port 8001
-        |
-        v
-   [PostgreSQL]
-   (Compose service: db)
-```
-
-
-
-## Repository structure
-
-```text
-ReleaseGuard/
-├── docker-compose.yml        # Phase 4: db + fake-router + releaseguard
-├── fake-router/              # Fake router API (Phase 1)
-│   ├── Dockerfile
-│   └── README.md
-├── releaseguard/             # Test runner + Postgres (Phase 3+)
-│   ├── Dockerfile
-│   └── README.md
-└── README.md                 # Overview of the whole project
-```
-
-
-
 ## Quick start
 
-### Docker Compose (Phase 4) — recommended for local demo
+```bash
+git clone https://github.com/jasonlee44/ReleaseGuard.git
+cd ReleaseGuard
+```
+
+### Docker Compose (recommended for local demo)
 
 Requires Docker (e.g. Colima or Docker Desktop) running.
 
@@ -108,6 +39,8 @@ Ports: **8000** (releaseguard), **8001** (fake-router), **5432** (Postgres). Sto
 Host `pytest` does **not** require Compose; keep using local Postgres + `releaseguard_test` as documented in [`releaseguard/README.md`](releaseguard/README.md).
 
 ### Without Docker (venvs + local Postgres)
+
+From the repo root (after cloning above). Postgres must be running locally with a `releaseguard` database for the runner.
 
 #### Fake router
 
@@ -137,6 +70,58 @@ uvicorn app.main:app --reload --port 8000
 
 Then open `http://localhost:8000/docs` to create builds and test runs.
 
+## Current status
+
+**Phase 4 complete.** The full local stack (Postgres, fake-router, releaseguard) runs with Docker Compose. Builds, test runs, and case results are saved in PostgreSQL.
+
+**Today**
+
+- Fake router with health, devices, config, firmware, and fault modes
+- ReleaseGuard builds and test runs APIs (default + chaos suites)
+- PostgreSQL persistence and Docker Compose one-command demo
+- Pytest for the runner (mocked fake-router); optional `RUN_INTEGRATION=1`
+
+**Not yet**
+
+- Auto-generated bug reports
+- CI or a frontend
+
+## Architecture
+
+You create a build in ReleaseGuard, start a test run with `suite` set to `default` (ship gate) or `chaos` (reliability probes), and ReleaseGuard stores the results in PostgreSQL.
+
+```text
+[You / API docs]
+        |
+        v
+[ReleaseGuard test runner]  --->  [Fake router service]
+   (Phase 4: Compose)             (Phase 1: complete)
+   port 8000                      port 8001
+        |
+        v
+   [PostgreSQL]
+   (Compose service: db)
+```
+
+## Repository structure
+
+```text
+ReleaseGuard/
+├── docker-compose.yml        # Phase 4: db + fake-router + releaseguard
+├── fake-router/              # Fake router API (Phase 1)
+│   ├── Dockerfile
+│   └── README.md
+├── releaseguard/             # Test runner + Postgres (Phase 3+)
+│   ├── Dockerfile
+│   └── README.md
+└── README.md                 # Overview of the whole project
+```
+
+## Why I built it
+
+When you ship a new backend release, things can break in ways normal "happy path" tests miss. I wanted a project that looks for those failures on purpose, and that also lets me practice backend and infrastructure skills: APIs, testing, reliability, databases, Docker, and CI.
+
+I'm building it step by step, starting with the APIs.
 
 ## Roadmap
 
@@ -147,3 +132,13 @@ Then open `http://localhost:8000/docs` to create builds and test runs.
 5. **Phase 5: Bug report generation** - turn failed tests into a readable report
 6. **Phase 6: CI/CD** - run tests automatically on push
 7. **Phase 7: Frontend dashboard** - simple UI to view builds and results (only after the backend works)
+
+## Tech stack
+
+| Area                | Technology                                                    |
+| ------------------- | ------------------------------------------------------------- |
+| Backend             | Python, FastAPI, Pydantic, SQLAlchemy                         |
+| HTTP client / tests | httpx, pytest                                                 |
+| Database            | PostgreSQL                                                    |
+| Infra               | Docker Compose (local demo); GitHub Actions (planned)         |
+| Frontend (later)    | React, TypeScript                                             |
