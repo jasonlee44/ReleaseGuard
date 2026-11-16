@@ -1,8 +1,10 @@
-# ReleaseGuard - Phase 1: Fake Router Service
+# ReleaseGuard — Fake Router Service
 
 Simulated router/network device API used by ReleaseGuard for release reliability testing.
 
-This service is implemented. It behaves normally by default and can be switched into fault modes so later ReleaseGuard tests have realistic failures to catch. Device data is kept in memory (no database).
+This service is implemented. It behaves normally by default and can be switched into fault modes so ReleaseGuard tests have realistic failures to catch. Device data is kept in memory (no database).
+
+For a one-command demo of fake-router together with ReleaseGuard and Postgres, use Docker Compose from the **repo root** (see Setup below).
 
 ## Endpoints
 
@@ -38,11 +40,24 @@ fake-router/
 │   ├── fault/               # Global fault mode state
 │   └── services/            # Business logic layer
 ├── tests/                   # pytest test suite
+├── Dockerfile               # Image used by Docker Compose
 ├── requirements.txt
 └── README.md
 ```
 
 ## Setup
+
+### Docker Compose (full stack)
+
+From the **repo root**:
+
+```bash
+docker compose up --build
+```
+
+Fake-router is published on port **8001** (`http://localhost:8001/docs`). It does not use Postgres. More detail is in the [root README](../README.md).
+
+### Without Docker (venv only)
 
 From the `fake-router/` directory:
 
@@ -57,7 +72,7 @@ Interactive API docs: `http://localhost:8001/docs`
 
 ## Tests
 
-With the virtualenv activated:
+Host pytest does not require Compose. With the virtualenv activated:
 
 ```bash
 pytest

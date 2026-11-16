@@ -1,8 +1,8 @@
-# ReleaseGuard — Phase 3: Test Runner + Postgres
+# ReleaseGuard — Test Runner + Postgres
 
 Backend that creates builds and runs reliability tests against the fake router service.
 
-**Status:** Phase 3 complete. Builds, test runs, and case results persist in PostgreSQL.
+**Status:** Phase 4 complete. Builds, test runs, and case results persist in PostgreSQL. For a one-command local demo of the full stack, use Docker Compose from the repo root (see Setup below).
 
 ## What it does
 
@@ -71,9 +71,28 @@ A chaos run is **`passed`** only if all 4 cases pass. Against stock fake-router,
 
 ## Setup
 
+### Docker Compose (recommended for local demo)
+
+From the **repo root** (not this directory):
+
+```bash
+docker compose up --build
+```
+
+Compose starts Postgres (`db`), fake-router, and this service together. ReleaseGuard is wired with:
+
+```text
+DATABASE_URL=postgresql+psycopg://releaseguard:releaseguard@db:5432/releaseguard
+FAKE_ROUTER_URL=http://fake-router:8001
+```
+
+Those credentials and hostnames apply only to the Compose Postgres container — not your Homebrew/local Postgres. Docs: `http://localhost:8000/docs`. More detail is in the [root README](../README.md).
+
+### Without Docker (venv + local Postgres)
+
 Start order: **Postgres** → **fake-router** (port 8001) → **releaseguard** (port 8000).
 
-### Postgres
+#### Postgres
 
 Postgres must be running locally. Create the app and test databases:
 
@@ -82,7 +101,7 @@ createdb releaseguard
 createdb releaseguard_test
 ```
 
-By default ReleaseGuard uses:
+By default ReleaseGuard uses the Mac-local URL:
 
 ```text
 postgresql+psycopg://jasonlee@localhost:5432/releaseguard
@@ -96,7 +115,7 @@ export DATABASE_URL=postgresql+psycopg://jasonlee@localhost:5432/releaseguard
 
 Tables are created automatically on app startup (`create_all`).
 
-### App
+#### App
 
 From the `releaseguard/` directory:
 
@@ -119,7 +138,7 @@ export FAKE_ROUTER_URL=http://localhost:8001
 
 ## Tests
 
-Pytest uses the `releaseguard_test` database (set in `tests/conftest.py`). That database must exist.
+Pytest does **not** require Docker Compose. It uses the local `releaseguard_test` database (set in `tests/conftest.py`). That database must exist on your host Postgres.
 
 ```bash
 pytest
